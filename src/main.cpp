@@ -37,8 +37,8 @@ int main(int argc, char* argv[]) {
     // KISS meta info
     int numInputs  = -1;
     int numOutputs = -1;
-    int numProducts = -1; // .p (not strictly needed)
-    int numStatesDeclared = -1; // .s (not strictly needed)
+    int numProducts = -1; // .p
+    int numStatesDeclared = -1; // .s
     string resetStateName;
 
     bool inKiss = false;
@@ -54,7 +54,7 @@ int main(int argc, char* argv[]) {
         return id;
     };
 
-    set<string> inputPatterns; // all distinct input patterns used
+    set<string> inputPatterns;
 
     string line;
     while (std::getline(fin, line)) {
@@ -62,7 +62,6 @@ int main(int argc, char* argv[]) {
         if (line.empty()) continue;
 
         if (line[0] == '.') {
-            // Directive line
             string token;
             stringstream ss(line);
             ss >> token;
@@ -86,11 +85,9 @@ int main(int argc, char* argv[]) {
                 }
             }
         } else if (inKiss) {
-            // Transition line: input present next output
             string in, ps, ns, out;
             stringstream ss(line);
             if (!(ss >> in >> ps >> ns >> out)) {
-                // malformed line, skip
                 continue;
             }
             RawTransition rt{in, ps, ns, out};
@@ -109,7 +106,6 @@ int main(int argc, char* argv[]) {
     }
 
     if (stateIndex.find(resetStateName) == stateIndex.end()) {
-        // in case reset state only appeared in .r but not transitions
         getStateId(resetStateName);
     }
 
@@ -130,7 +126,7 @@ int main(int argc, char* argv[]) {
     vector<string> inputList(inputPatterns.begin(), inputPatterns.end());
     sort(inputList.begin(), inputList.end());
 
-    // ----- Compute reachable states from reset -----
+    // Compute reachable states from reset
     vector<bool> reachable(nStates, false);
     queue<int> q;
     reachable[resetId] = true;
@@ -147,7 +143,7 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    // ----- State minimization via partition refinement -----
+    // State minimization via partition refinement
     // part[i] = block id of state i
     vector<int> part(nStates, 0);
 
@@ -194,7 +190,7 @@ int main(int argc, char* argv[]) {
     for (int v : part) maxBlock = max(maxBlock, v);
     int totalBlocks = maxBlock + 1;
 
-    // ----- Map blocks (equivalence classes) to new states (only reachable) -----
+    // Map blocks (equivalence classes) to new states (only reachable)
     vector<bool> blockReachable(totalBlocks, false);
     for (int s = 0; s < nStates; ++s) {
         if (reachable[s]) {
@@ -215,7 +211,7 @@ int main(int argc, char* argv[]) {
     // Assign new indices and names to reachable blocks
     vector<int> blockToNewIndex(totalBlocks, -1);
     vector<string> newStateNames;
-    vector<int> newStateRep; // representative original state for each new state
+    vector<int> newStateRep;
 
     for (int b = 0; b < totalBlocks; ++b) {
         if (!blockReachable[b]) continue;
@@ -223,18 +219,18 @@ int main(int argc, char* argv[]) {
         if (rep == -1) continue;
         int newIdx = (int)newStateNames.size();
         blockToNewIndex[b] = newIdx;
-        newStateNames.push_back(states[rep]); // use representative original name
+        newStateNames.push_back(states[rep]);
         newStateRep.push_back(rep);
     }
 
     const int nNewStates = (int)newStateNames.size();
 
-    // Find new reset state name (block of original resetId)
+    // Find new reset state name
     int resetBlock = part[resetId];
     int resetNewIndex = blockToNewIndex[resetBlock];
     string newResetName = newStateNames[resetNewIndex];
 
-    // ----- Build minimized transitions (KISS) -----
+    // Build minimized transitions (KISS)
     struct MinTransition {
         string input;
         string present;
@@ -250,7 +246,6 @@ int main(int argc, char* argv[]) {
         for (const auto &inp : inputList) {
             auto it = transTable[rep].find(inp);
             if (it == transTable[rep].end()) {
-                // should not happen for completely specified STG
                 continue;
             }
             int ns = it->second.first;
@@ -258,7 +253,6 @@ int main(int argc, char* argv[]) {
             int destBlock = part[ns];
             int destNewIdx = blockToNewIndex[destBlock];
             if (destNewIdx < 0) {
-                // destination is unreachable? shouldn't happen if rep is reachable
                 continue;
             }
             const string &destName = newStateNames[destNewIdx];
@@ -268,7 +262,7 @@ int main(int argc, char* argv[]) {
 
     int newNumProducts = (int)minTrans.size();
 
-    // ----- Write output KISS -----
+    // Write output KISS
     ofstream foutK(outputKissPath);
     if (!foutK) {
         cerr << "Error: cannot open output KISS file: " << outputKissPath << "\n";
@@ -289,8 +283,8 @@ int main(int argc, char* argv[]) {
     foutK << ".end_kiss\n";
     foutK.close();
 
-    // ----- Build DOT graph -----
-    // Merge labels for same edge (present,next)
+    // Build DOT graph
+    // Merge labels for same edge
     map<pair<string,string>, vector<string>> edgeLabels;
     for (const auto &mt : minTrans) {
         string label = mt.input + "/" + mt.output;
