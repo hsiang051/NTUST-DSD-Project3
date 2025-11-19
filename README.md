@@ -32,11 +32,6 @@ To run the state minimization program, execute `smin` from the `bin` directory.
 <path_to_executable>/smin <input_kiss> <output_kiss> <output_dot>
 ```
 
-**Example (running from the project root):**
-```bash
-./bin/smin B11330203.kiss output.kiss output.dot
-```
-
 ## Visualization
 To convert the output DOT file to a PNG image (requires Graphviz):
 ```bash
